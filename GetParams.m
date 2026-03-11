@@ -22,3 +22,4 @@ heli.A = pi * heli.R^2;
 
 % Atmosphere Parameters
 atm.rho = 1.225;
+atm.T = 287.3;
