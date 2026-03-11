@@ -43,12 +43,18 @@ exportgraphics(gcf, PLOT_DIR + "vi_forward_flight.png");
 perf.P_hov_i = heli.W * perf.vi_hov;
 perf.P_hov_ACT = perf.P_hov_i / heli.FM;
 
-perf.P_hov_BEM =
+CDp  = 0.00322; % from airfoilTools 
+P_i  = heli.k * heli.W * perf.vi_hov;
+P_p  = (heli.sigma * CDp / 8) * atm.rho * (heli.Omega * heli.R)^3 * pi * heli.R^2;
+perf.P_hov_BEM = P_i + P_p;
+
+fprintf("Ideal Power required to hover: %.3fkW\n", perf.P_hov_i*1e-3)
+fprintf("ACT Power required to hover: %.3fkW\n", perf.P_hov_ACT*1e-3)
+fprintf("BEM Power required to hover: %.3fkW\n", perf.P_hov_BEM*1e-3)
 
 %% Power calculation Forward flight
 
 % Profile drag power
-P_hover_BEM = 550.9e3;
-perf.P_profile = P_hover_BEM*(1+heli.Mu.^2);
+perf.P_profile = perf.P_hov_BEM*(1+heli.Mu.^2);
 
 % Rotor drag power

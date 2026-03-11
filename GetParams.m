@@ -15,6 +15,7 @@ heli.Rtail = 2.59/2;
 heli.cgdist = 2.07;
 heli.Iyy = 17259;
 heli.FM = 0.75;
+heli.k = 1.15;
 
 heli.sigma = heli.N*heli.c/(pi*heli.R);
 heli.W = heli.m*9.81;
