@@ -9,11 +9,11 @@ set(0, 'DefaultFigureVisible', 'off');
 perf = struct();
 
 %% Induced velocity Hover
-perf.vi_hov = sqrt(heli.W/(2*atm.rho*pi*heli.R^2));
+perf.hov.vi = sqrt(heli.W/(2*atm.rho*pi*heli.R^2));
 
 %% Induced velocity forward flight
-perf.Vbar_range = (0:1:heli.maxV)./perf.vi_hov;
-perf.vi_ff = zeros(size(perf.Vbar_range));
+perf.Vbar_range = (0:1:heli.maxV)./perf.hov.vi;
+perf.ff.vi = zeros(size(perf.Vbar_range));
 alphad = 0;
 
 for i = 1:length(perf.Vbar_range)
@@ -26,13 +26,13 @@ for i = 1:length(perf.Vbar_range)
         end
         vi = vi_new;
     end
-    perf.vi_ff(i) = vi;
+    perf.ff.vi(i) = vi;
 end
 
 figure; hold on;
-plot(perf.Vbar_range, perf.vi_ff, 'b-', 'LineWidth', 2);
+plot(perf.Vbar_range, perf.ff.vi, 'b-', 'LineWidth', 2);
 plot(perf.Vbar_range, 1./perf.Vbar_range, 'k--')
-plot((1./perf.vi_ff - perf.vi_ff), perf.vi_ff, 'k--'); hold off;
+plot((1./perf.ff.vi - perf.ff.vi), perf.ff.vi, 'k--'); hold off;
 xlabel('Forward velocity V');
 ylabel('Induced velocity v_i');
 title('Induced velocity vs forward speed (normalized to v_{i,hov})');
@@ -40,21 +40,20 @@ grid on; ylim([0 1]); xlim([0 5]);
 exportgraphics(gcf, PLOT_DIR + "vi_forward_flight.png");
 
 %% Power calculation Hover
-perf.P_hov_i = heli.W * perf.vi_hov;
-perf.P_hov_ACT = perf.P_hov_i / heli.FM;
+perf.hov.P_ideal = heli.W * perf.hov.vi;
+perf.hov.P_ACT = perf.hov.P_ideal / heli.FM;
 
-CDp  = 0.00322; % from airfoilTools 
-P_i  = heli.k * heli.W * perf.vi_hov;
-P_p  = (heli.sigma * CDp / 8) * atm.rho * (heli.Omega * heli.R)^3 * pi * heli.R^2;
-perf.P_hov_BEM = P_i + P_p;
+perf.hov.P_i  = heli.k * heli.W * perf.hov.vi;
+perf.hov.P_p  = (heli.sigma * CDp / 8) * atm.rho * (heli.Omega * heli.R)^3 * pi * heli.R^2;
+perf.hov.P_BEM = perf.hov.P_i + perf.hov.P_p;
 
-fprintf("Ideal Power required to hover: %.3fkW\n", perf.P_hov_i*1e-3)
-fprintf("ACT Power required to hover: %.3fkW\n", perf.P_hov_ACT*1e-3)
-fprintf("BEM Power required to hover: %.3fkW\n", perf.P_hov_BEM*1e-3)
+fprintf("Ideal Power required to hover: %.3fkW\n", perf.hov.P_ideal.*1e-3)
+fprintf("ACT Power required to hover: %.3fkW\n", perf.hov.P_ACT.*1e-3)
+fprintf("BEM Power required to hover: %.3fkW\n", perf.hov.P_BEM.*1e-3)
 
 %% Power calculation Forward flight
 
 % Profile drag power
-perf.P_profile = perf.P_hov_BEM*(1+heli.Mu.^2);
+perf.P_profile = perf.hov.P_BEM*(1+heli.Mu.^2);
 
 % Rotor drag power
