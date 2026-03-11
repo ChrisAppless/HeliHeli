@@ -1,5 +1,9 @@
 clear; close all; clc
 
+PLOT_DIR = "plots/";
+if ~exist(PLOT_DIR, 'dir'), mkdir(PLOT_DIR); end
+set(0, 'DefaultFigureVisible', 'off');
+
 [heli, atm] = GetParams;
 
 %% Induced velocity Hover
@@ -33,6 +37,7 @@ title('Induced velocity vs forward speed (normalized to v_{i,hov})');
 grid on;
 ylim([0 1]);
 xlim([0 5]);
+exportgraphics(gcf, PLOT_DIR + "vi_forward_flight.png");
 
 %%Forward flight power calculations
 
