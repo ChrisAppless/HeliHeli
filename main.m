@@ -33,3 +33,12 @@ title('Induced velocity vs forward speed (normalized to v_{i,hov})');
 grid on;
 ylim([0 1]);
 xlim([0 5]);
+
+%%Forward flight power calculations
+
+% Profile drag power
+P_hover_BEM = 550.9e3;
+Mu = heli.maxV / (heli.Omega * heli.R);
+P_profile = P_hover_BEM*(1+Mu.^2);
+
+% Rotor drag power
