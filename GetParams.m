@@ -6,10 +6,12 @@ heli.R = 14.63/2;
 heli.N = 2;
 heli.RPS = 5.4;
 heli.maxV = 56.67;
+heli.FM = 0.75;
 
 heli.W = heli.m*9.81;
 heli.Omega = heli.RPS * 2*pi;
 heli.A = pi * heli.R^2;
+heli.Mu = heli.maxV / (heli.Omega * heli.R);
 
 % Atmosphere Parameters
 atm.rho = 1.225;
