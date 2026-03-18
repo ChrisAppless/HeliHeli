@@ -17,6 +17,7 @@ heli.Iyy = 17259;
 heli.FM = 0.75;
 heli.k = 1.15;
 heli.CDp = 0.00322; % from airfoilTools 
+heli.Afront = 4.46;
 
 heli.sigma = heli.N*heli.c/(pi*heli.R);
 heli.W = heli.m*9.81;

@@ -44,7 +44,7 @@ perf.hov.P_ideal = heli.W * perf.hov.vi;
 perf.hov.P_ACT = perf.hov.P_ideal / heli.FM;
 
 perf.hov.P_i  = heli.k * heli.W * perf.hov.vi;
-perf.hov.P_p  = (heli.sigma * CDp / 8) * atm.rho * (heli.Omega * heli.R)^3 * pi * heli.R^2;
+perf.hov.P_p  = (heli.sigma * heli.CDp / 8) * atm.rho * (heli.Omega * heli.R)^3 * pi * heli.R^2;
 perf.hov.P_BEM = perf.hov.P_i + perf.hov.P_p;
 
 fprintf("Ideal Power required to hover: %.3fkW\n", perf.hov.P_ideal.*1e-3)
@@ -57,3 +57,10 @@ fprintf("BEM Power required to hover: %.3fkW\n", perf.hov.P_BEM.*1e-3)
 perf.P_profile = perf.hov.P_BEM*(1+heli.Mu.^2);
 
 % Rotor drag power
+perf.P_drag = heli.sigma*heli.CDp/4 * atm.rho*(heli.Omega*heli.R)^3*pi*heli.R*heli.sigma^2;
+
+% Induced power 
+perf.P_induced = heli.k*heli.m*9.81*vi;
+
+% Parasite drag power
+perf.P_parasite = 0.5 * atm.rho * heli.maxV^3;
