@@ -52,15 +52,22 @@ fprintf("ACT Power required to hover: %.3fkW\n", perf.hov.P_ACT.*1e-3)
 fprintf("BEM Power required to hover: %.3fkW\n", perf.hov.P_BEM.*1e-3)
 
 %% Power calculation Forward flight
+vi_interp = @(V) perf.hov.vi .* interp1(perf.Vbar_range, perf.ff.vi, V ./ perf.hov.vi, "linear", "extrap");
+getMu = @(V) V ./ (heli.Omega .* heli.R);
 
 % Profile drag power
-perf.P_profile = perf.hov.P_BEM*(1+heli.Mu.^2);
+getPp = @(V) perf.hov.P_BEM*(1+getMu(V).^2);
 
 % Rotor drag power
-perf.P_drag = heli.sigma*heli.CDp/4 * atm.rho*(heli.Omega*heli.R)^3*pi*heli.R*heli.sigma^2;
+getRDP = @(V) heli.sigma*heli.CDp/4 * atm.rho*(heli.Omega*heli.R)^3*pi*heli.R*getMu(V)^2;
 
 % Induced power 
-perf.P_induced = heli.k*heli.m*9.81*vi;
+getIP = @(V) heli.k*heli.m*9.81*vi_interp(V);
 
 % Parasite drag power
-perf.P_parasite = 0.5 * atm.rho * heli.maxV^3;
+getPpara = @(V) () .* 0.5 * atm.rho * V^3;
+
+% Tail rotor induced drag
+perf.Torque_main = perf.P_drag
+perf.T_tail = 
+perf.P_tail_induced = 

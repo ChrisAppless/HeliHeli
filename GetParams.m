@@ -13,6 +13,7 @@ heli.hoverceiling = 1220;
 heli.Ntail = 2;
 heli.Rtail = 2.59/2;
 heli.cgdist = 2.07;
+heli.tailarm = 8.53; % Horizontal distance of tail to cg
 heli.Iyy = 17259;
 heli.FM = 0.75;
 heli.k = 1.15;
