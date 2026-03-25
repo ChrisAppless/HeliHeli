@@ -11,6 +11,8 @@ getCD = @(alpha) interp1(naca0012_polar(:,1), naca0012_polar(:,4), alpha, 'linea
 
 perf = struct();
 
+%% Part 1
+
 %% Induced velocity Hover
 perf.hov.vi = sqrt(heli.W/(2*atm.rho*pi*heli.R^2));
 
@@ -107,3 +109,6 @@ ylabel('Power (kW)');
 title('Power vs forward velocity');
 grid on;
 exportgraphics(gcf, PLOT_DIR + "P_forward_flight.png");
+
+%% Part 2
+
