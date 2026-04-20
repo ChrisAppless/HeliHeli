@@ -112,3 +112,122 @@ exportgraphics(gcf, PLOT_DIR + "P_forward_flight.png");
 
 %% Part 2
 
+V2       = heli.forV;
+q_rate   = deg2rad(heli.q);
+p_rate   = deg2rad(heli.p);
+theta_0  = deg2rad(6);
+theta_1c = deg2rad(1);
+theta_1s = deg2rad(2);
+
+heli.m_blade = 100;
+heli.Ib      = (1/3) * heli.m_blade * heli.R^2;
+Cla          = 2*pi;
+gamma_lock   = atm.rho * Cla * heli.c * heli.R^4 / heli.Ib;
+
+alphad = 0;
+mu     = V2 * cos(alphad) / (heli.Omega * heli.R);
+vi_V2  = vi_interp(V2);
+lambda = (V2 * sin(alphad) + vi_V2) / (heli.Omega * heli.R);
+
+q_bar = q_rate / heli.Omega;
+p_bar = p_rate / heli.Omega;
+
+theta_fn = @(psi) theta_0 + theta_1c*cos(psi) + theta_1s*sin(psi);
+uT_fn    = @(x, psi) x + mu*sin(psi);
+uP_fn    = @(x, psi, beta, bdot) lambda + x.*bdot + mu*beta.*cos(psi) ...
+           + x.*(p_bar*sin(psi) - q_bar*cos(psi));
+
+Mbeta = @(psi, beta, bdot) (gamma_lock/2) * ( ...
+      theta_fn(psi)  .* (1/4 + (2*mu/3).*sin(psi) + (mu^2/2).*sin(psi).^2) ...
+    - lambda           * (1/3 + (mu/2).*sin(psi)) ...
+    - bdot            .* (1/4 + (mu/3).*sin(psi)) ...
+    - mu*beta.*cos(psi).* (1/3 + (mu/2).*sin(psi)) ...
+    - (p_bar*sin(psi) - q_bar*cos(psi)) .* (1/4 + (mu/3).*sin(psi)) );
+
+odefun = @(psi, y) [ y(2); ...
+                    -y(1) + Mbeta(psi, y(1), y(2)) ...
+                    + 2*(p_bar*cos(psi) + q_bar*sin(psi)) ];
+
+opts = odeset('RelTol', 1e-8, 'AbsTol', 1e-10);
+[psi_sim, y_sim] = ode45(odefun, [0, 20*pi], [0; 0], opts);
+
+mask     = psi_sim >= 18*pi;
+psi_rev  = psi_sim(mask) - 18*pi;
+beta_rev = y_sim(mask, 1);
+bdot_rev = y_sim(mask, 2);
+[psi_rev, idx] = unique(psi_rev);
+beta_rev = beta_rev(idx);
+bdot_rev = bdot_rev(idx);
+
+psi_plot  = linspace(0, 2*pi, 361)';
+beta_plot = interp1(psi_rev, beta_rev, psi_plot, 'pchip', 'extrap');
+bdot_plot = interp1(psi_rev, bdot_rev, psi_plot, 'pchip', 'extrap');
+
+a0 = mean(beta_plot);
+a1 = -2*mean(beta_plot .* cos(psi_plot));
+b1 = -2*mean(beta_plot .* sin(psi_plot));
+
+perf.p2.a0 = rad2deg(a0);
+perf.p2.a1 = rad2deg(a1);
+perf.p2.b1 = rad2deg(b1);
+perf.p2.gamma  = gamma_lock;
+perf.p2.mu     = mu;
+perf.p2.lambda = lambda;
+
+fprintf('\n=== Part 2 - Rotor Dynamics ===\n');
+fprintf('Lock number gamma        = %.3f\n', gamma_lock);
+fprintf('Advance ratio mu         = %.4f\n', mu);
+fprintf('Inflow ratio lambda      = %.4f\n', lambda);
+fprintf('Coning a0                = %.3f deg\n', rad2deg(a0));
+fprintf('Longitudinal tilt a1     = %.3f deg\n', rad2deg(a1));
+fprintf('Lateral tilt      b1     = %.3f deg\n', rad2deg(b1));
+
+figure; hold on;
+plot(rad2deg(psi_plot), rad2deg(beta_plot), 'b-', 'LineWidth', 2);
+plot(rad2deg(psi_plot), rad2deg(a0 - a1*cos(psi_plot) - b1*sin(psi_plot)), 'r--', 'LineWidth', 1.5);
+xline(90,  'k:', 'advancing');
+xline(180, 'k:', 'front');
+xline(270, 'k:', 'retreating');
+xlabel('\psi (deg)'); ylabel('\beta (deg)');
+title(sprintf('Blade flapping  V=%g m/s, q=%g°/s, p=%g°/s', V2, heli.q, heli.p));
+legend('ODE solution', 'a_0 - a_1 cos\psi - b_1 sin\psi', 'Location', 'best');
+grid on; xlim([0 360]); hold off;
+exportgraphics(gcf, PLOT_DIR + "P2_flapping_angle.png");
+
+x_075     = 0.75;
+uT_075    = uT_fn(x_075, psi_plot);
+uP_075    = uP_fn(x_075, psi_plot, beta_plot, bdot_plot);
+alpha_075 = theta_fn(psi_plot) - atan2(uP_075, uT_075);
+
+figure;
+plot(rad2deg(psi_plot), rad2deg(alpha_075), 'LineWidth', 2);
+xline(90,  'k:', 'advancing');
+xline(270, 'k:', 'retreating');
+xlabel('\psi (deg)'); ylabel('\alpha (deg)');
+title('Angle of attack at r/R = 0.75');
+grid on; xlim([0 360]);
+exportgraphics(gcf, PLOT_DIR + "P2_AoA_psi.png");
+
+x_grid    = linspace(0.15, 1, 60);
+[PSI, X]  = meshgrid(psi_plot, x_grid);
+BETA      = repmat(beta_plot', length(x_grid), 1);
+BDOT      = repmat(bdot_plot', length(x_grid), 1);
+THETA     = theta_0 + theta_1c*cos(PSI) + theta_1s*sin(PSI);
+UT_g      = X + mu*sin(PSI);
+UP_g      = lambda + X.*BDOT + mu*BETA.*cos(PSI) + X.*(p_bar*sin(PSI) - q_bar*cos(PSI));
+ALPHA_deg = rad2deg(THETA - atan2(UP_g, UT_g));
+
+Xcart =  X .* sin(PSI);
+Ycart = -X .* cos(PSI);
+
+figure; hold on;
+contourf(Xcart, Ycart, ALPHA_deg, 20, 'LineColor', 'none');
+contour (Xcart, Ycart, ALPHA_deg, 12, 'k', 'LineWidth', 0.4, 'ShowText', 'on');
+plot(cos(linspace(0,2*pi,200)), sin(linspace(0,2*pi,200)), 'k-', 'LineWidth', 1.5);
+axis equal; colorbar; grid on;
+xlabel('\leftarrow Retreating    Advancing \rightarrow');
+ylabel('\leftarrow Aft    Forward \rightarrow');
+title('\alpha on rotor disc [deg]');
+xlim([-1.1 1.1]); ylim([-1.1 1.1]); hold off;
+exportgraphics(gcf, PLOT_DIR + "P2_AoA_disc.png");
+
