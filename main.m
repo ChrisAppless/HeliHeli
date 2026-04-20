@@ -112,106 +112,85 @@ exportgraphics(gcf, PLOT_DIR + "P_forward_flight.png");
 
 %% Part 2
 
-V2       = heli.forV;
-q_rate   = deg2rad(heli.q);
-p_rate   = deg2rad(heli.p);
-theta_0  = deg2rad(6);
-theta_1c = deg2rad(1);
-theta_1s = deg2rad(2);
+% Question 1
+theta_0 = deg2rad(6);   % collective pitch [rad]
+A1      = deg2rad(2);   % longitudinal cyclic [rad]
+B1      = deg2rad(1);   % lateral cyclic [rad]
 
-heli.m_blade = 100;
-heli.Ib      = (1/3) * heli.m_blade * heli.R^2;
-Cla          = 2*pi;
-gamma_lock   = atm.rho * Cla * heli.c * heli.R^4 / heli.Ib;
+V = heli.forV;                  % [m/s]
+q = deg2rad(heli.q);    % pitch rate [rad/s]
+p = deg2rad(heli.p);    % roll rate [rad/s]
 
-alphad = 0;
-mu     = V2 * cos(alphad) / (heli.Omega * heli.R);
-vi_V2  = vi_interp(V2);
-lambda = (V2 * sin(alphad) + vi_V2) / (heli.Omega * heli.R);
+% Lock number
+a_lift = 2*pi;
+I_bl   = (1/3) * heli.m_blade * heli.R^2;
+gamma  = atm.rho * a_lift * heli.c * heli.R^4 / I_bl;
 
-q_bar = q_rate / heli.Omega;
-p_bar = p_rate / heli.Omega;
+% Control plane angle of attack (level flight trim: rotor tilts forward to overcome drag)
+D_para   = heli.Afront * heli.fuse_CD * 0.5 * atm.rho * V^2;
+alpha_c  = -atan(D_para / heli.W);  % negative = nose down
 
-theta_fn = @(psi) theta_0 + theta_1c*cos(psi) + theta_1s*sin(psi);
-uT_fn    = @(x, psi) x + mu*sin(psi);
-uP_fn    = @(x, psi, beta, bdot) lambda + x.*bdot + mu*beta.*cos(psi) ...
-           + x.*(p_bar*sin(psi) - q_bar*cos(psi));
+% Non-dimensional inflow
+mu       = V * cos(alpha_c) / (heli.Omega * heli.R);
+lambda_c = V * sin(alpha_c) / (heli.Omega * heli.R);
+lambda_i = vi_interp(V) / (heli.Omega * heli.R);
 
-g = gamma_lock;
-M = [ 1,         0,              0;
-      0,         g*(2-mu^2)/16,  0;
-     -g*mu/6,    0,              g*(2+mu^2)/16 ];
-r = [ g*theta_0*(1+mu^2)/8 + g*mu*theta_1s/6 - g*lambda/6 - g*mu*p_bar/12;
-      g*mu*theta_0/3 + g*theta_1s*(2+3*mu^2)/16 - g*lambda*mu/4 - g*p_bar/8 + 2*q_bar;
-     -g*theta_1c*(2+mu^2)/16 - g*q_bar/8 - 2*p_bar ];
-coef = M \ r;
-a0 = coef(1);
-a1 = coef(2);
-b1 = coef(3);
+% Flapping coefficients (order matters: a0 first)
+a0 = gamma/8 * (theta_0*(1 + mu^2) - (4/3)*(lambda_i + lambda_c));
 
-psi_plot  = linspace(0, 2*pi, 361)';
-beta_plot = a0 - a1*cos(psi_plot) - b1*sin(psi_plot);
-bdot_plot = a1*sin(psi_plot) - b1*cos(psi_plot);
+a1 = (A1 - (16/gamma)*(q/heli.Omega) + (8/3)*mu*theta_0 - 2*mu*(lambda_c + lambda_i)) ...
+     / (1 - mu^2/2);
 
-perf.p2.a0 = rad2deg(a0);
-perf.p2.a1 = rad2deg(a1);
-perf.p2.b1 = rad2deg(b1);
-perf.p2.gamma  = gamma_lock;
-perf.p2.mu     = mu;
-perf.p2.lambda = lambda;
+b1 = (B1 - p/heli.Omega + (4/3)*mu*a0) ...
+     / (1 + mu^2/2);
 
-fprintf('\n=== Part 2 - Rotor Dynamics ===\n');
-fprintf('Lock number gamma        = %.3f\n', gamma_lock);
-fprintf('Advance ratio mu         = %.4f\n', mu);
-fprintf('Inflow ratio lambda      = %.4f\n', lambda);
-fprintf('Coning a0                = %.3f deg\n', rad2deg(a0));
-fprintf('Longitudinal tilt a1     = %.3f deg\n', rad2deg(a1));
-fprintf('Lateral tilt      b1     = %.3f deg\n', rad2deg(b1));
+psi          = linspace(0, 360, 360);
+flapping_ang = rad2deg(a0 - a1*cosd(psi) - b1*sind(psi));
 
 figure;
-plot(rad2deg(psi_plot), rad2deg(beta_plot), 'b-', 'LineWidth', 2);
-xline(90,  'k:', 'advancing');
-xline(180, 'k:', 'front');
-xline(270, 'k:', 'retreating');
-xlabel('\psi (deg)'); ylabel('\beta (deg)');
-title(sprintf('Blade flapping  V=%g m/s, q=%g°/s, p=%g°/s', V2, heli.q, heli.p));
-grid on; xlim([0 360]);
+plot(psi, flapping_ang, 'b-', 'LineWidth', 2);
+xlabel('\psi (deg)');
+ylabel('\beta (deg)');
+title('Blade flapping angle over one revolution');
+xlim([0 360])
+grid on;
 exportgraphics(gcf, PLOT_DIR + "P2_flapping_angle.png");
 
-x_075     = 0.75;
-uT_075    = uT_fn(x_075, psi_plot);
-uP_075    = uP_fn(x_075, psi_plot, beta_plot, bdot_plot);
-alpha_075 = theta_fn(psi_plot) - atan2(uP_075, uT_075);
+% Question 2 
+xy_lin = linspace(-1, 1, 400);
+[Xq, Yq] = meshgrid(xy_lin, xy_lin);
+
+r_cart   = sqrt(Xq.^2 + Yq.^2) * heli.R;
+psi_cart = atan2d(Xq, -Yq);
+psi_cart(psi_cart < 0) = psi_cart(psi_cart < 0) + 360;
+
+theta_cart    = theta_0 - A1*cosd(psi_cart) - B1*sind(psi_cart);
+beta_cart     = a0 - a1*cosd(psi_cart) - b1*sind(psi_cart);
+beta_dot_cart = heli.Omega * (a1*sind(psi_cart) - b1*cosd(psi_cart));
+
+V_perp_cart = V*sin(alpha_c) + vi_interp(V) ...
+            + beta_dot_cart.*r_cart ...
+            - q*r_cart.*cosd(psi_cart) ...
+            + V*cos(alpha_c)*cosd(psi_cart).*beta_cart;
+
+V_tan_cart = heli.Omega*r_cart + V*cos(alpha_c)*sind(psi_cart);
+
+alpha_cart = rad2deg(theta_cart - V_perp_cart ./ V_tan_cart);
+alpha_cart(Xq.^2 + Yq.^2 > 1) = NaN;             % outside disc
+alpha_cart(Xq.^2 + Yq.^2 + 2*mu*Xq <= 0) = NaN;  % reverse flow region
 
 figure;
-plot(rad2deg(psi_plot), rad2deg(alpha_075), 'LineWidth', 2);
-xline(90,  'k:', 'advancing');
-xline(270, 'k:', 'retreating');
-xlabel('\psi (deg)'); ylabel('\alpha (deg)');
-title('Angle of attack at r/R = 0.75');
-grid on; xlim([0 360]);
-exportgraphics(gcf, PLOT_DIR + "P2_AoA_psi.png");
-
-x_grid    = linspace(0.15, 1, 60);
-[PSI, X]  = meshgrid(psi_plot, x_grid);
-BETA      = repmat(beta_plot', length(x_grid), 1);
-BDOT      = repmat(bdot_plot', length(x_grid), 1);
-THETA     = theta_0 + theta_1c*cos(PSI) + theta_1s*sin(PSI);
-UT_g      = X + mu*sin(PSI);
-UP_g      = lambda + X.*BDOT + mu*BETA.*cos(PSI) + X.*(p_bar*sin(PSI) - q_bar*cos(PSI));
-ALPHA_deg = rad2deg(THETA - atan2(UP_g, UT_g));
-
-Xcart =  X .* sin(PSI);
-Ycart = -X .* cos(PSI);
-
-figure; hold on;
-contourf(Xcart, Ycart, ALPHA_deg, 20, 'LineColor', 'none');
-contour (Xcart, Ycart, ALPHA_deg, 12, 'k', 'LineWidth', 0.4, 'ShowText', 'on');
-plot(cos(linspace(0,2*pi,200)), sin(linspace(0,2*pi,200)), 'k-', 'LineWidth', 1.5);
-axis equal; colorbar; grid on;
-xlabel('\leftarrow Retreating    Advancing \rightarrow');
-ylabel('\leftarrow Aft    Forward \rightarrow');
-title('\alpha on rotor disc [deg]');
-xlim([-1.1 1.1]); ylim([-1.1 1.1]); hold off;
+contour(Xq, Yq, alpha_cart, -2:0.5:7, 'ShowText', 'on', 'LineWidth', 1.2);
+xlabel('Blade position (nondimensional)');
+ylabel('Blade position (nondimensional)');
+title('Curves of constant angle of attack');
+text(-0.7, -1.15, 'Retreating side', 'HorizontalAlignment', 'center');
+text( 0.7, -1.15, 'Advancing side',  'HorizontalAlignment', 'center');
+axis equal; grid on; colorbar;
 exportgraphics(gcf, PLOT_DIR + "P2_AoA_disc.png");
+
+% Question 3
+fprintf("$a_0$ & %.4f° \\\\\n", rad2deg(a0))
+fprintf("$a_1$ & %.4f° \\\\\n", rad2deg(a1))
+fprintf("$b_1$ & %.4f° \\\\\n", rad2deg(b1))
 
