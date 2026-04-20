@@ -137,35 +137,21 @@ uT_fn    = @(x, psi) x + mu*sin(psi);
 uP_fn    = @(x, psi, beta, bdot) lambda + x.*bdot + mu*beta.*cos(psi) ...
            + x.*(p_bar*sin(psi) - q_bar*cos(psi));
 
-Mbeta = @(psi, beta, bdot) (gamma_lock/2) * ( ...
-      theta_fn(psi)  .* (1/4 + (2*mu/3).*sin(psi) + (mu^2/2).*sin(psi).^2) ...
-    - lambda           * (1/3 + (mu/2).*sin(psi)) ...
-    - bdot            .* (1/4 + (mu/3).*sin(psi)) ...
-    - mu*beta.*cos(psi).* (1/3 + (mu/2).*sin(psi)) ...
-    - (p_bar*sin(psi) - q_bar*cos(psi)) .* (1/4 + (mu/3).*sin(psi)) );
-
-odefun = @(psi, y) [ y(2); ...
-                    -y(1) + Mbeta(psi, y(1), y(2)) ...
-                    + 2*(p_bar*cos(psi) + q_bar*sin(psi)) ];
-
-opts = odeset('RelTol', 1e-8, 'AbsTol', 1e-10);
-[psi_sim, y_sim] = ode45(odefun, [0, 20*pi], [0; 0], opts);
-
-mask     = psi_sim >= 18*pi;
-psi_rev  = psi_sim(mask) - 18*pi;
-beta_rev = y_sim(mask, 1);
-bdot_rev = y_sim(mask, 2);
-[psi_rev, idx] = unique(psi_rev);
-beta_rev = beta_rev(idx);
-bdot_rev = bdot_rev(idx);
+g = gamma_lock;
+M = [ 1,         0,              0;
+      0,         g*(2-mu^2)/16,  0;
+     -g*mu/6,    0,              g*(2+mu^2)/16 ];
+r = [ g*theta_0*(1+mu^2)/8 + g*mu*theta_1s/6 - g*lambda/6 - g*mu*p_bar/12;
+      g*mu*theta_0/3 + g*theta_1s*(2+3*mu^2)/16 - g*lambda*mu/4 - g*p_bar/8 + 2*q_bar;
+     -g*theta_1c*(2+mu^2)/16 - g*q_bar/8 - 2*p_bar ];
+coef = M \ r;
+a0 = coef(1);
+a1 = coef(2);
+b1 = coef(3);
 
 psi_plot  = linspace(0, 2*pi, 361)';
-beta_plot = interp1(psi_rev, beta_rev, psi_plot, 'pchip', 'extrap');
-bdot_plot = interp1(psi_rev, bdot_rev, psi_plot, 'pchip', 'extrap');
-
-a0 = mean(beta_plot);
-a1 = -2*mean(beta_plot .* cos(psi_plot));
-b1 = -2*mean(beta_plot .* sin(psi_plot));
+beta_plot = a0 - a1*cos(psi_plot) - b1*sin(psi_plot);
+bdot_plot = a1*sin(psi_plot) - b1*cos(psi_plot);
 
 perf.p2.a0 = rad2deg(a0);
 perf.p2.a1 = rad2deg(a1);
@@ -182,16 +168,14 @@ fprintf('Coning a0                = %.3f deg\n', rad2deg(a0));
 fprintf('Longitudinal tilt a1     = %.3f deg\n', rad2deg(a1));
 fprintf('Lateral tilt      b1     = %.3f deg\n', rad2deg(b1));
 
-figure; hold on;
+figure;
 plot(rad2deg(psi_plot), rad2deg(beta_plot), 'b-', 'LineWidth', 2);
-plot(rad2deg(psi_plot), rad2deg(a0 - a1*cos(psi_plot) - b1*sin(psi_plot)), 'r--', 'LineWidth', 1.5);
 xline(90,  'k:', 'advancing');
 xline(180, 'k:', 'front');
 xline(270, 'k:', 'retreating');
 xlabel('\psi (deg)'); ylabel('\beta (deg)');
 title(sprintf('Blade flapping  V=%g m/s, q=%g°/s, p=%g°/s', V2, heli.q, heli.p));
-legend('ODE solution', 'a_0 - a_1 cos\psi - b_1 sin\psi', 'Location', 'best');
-grid on; xlim([0 360]); hold off;
+grid on; xlim([0 360]);
 exportgraphics(gcf, PLOT_DIR + "P2_flapping_angle.png");
 
 x_075     = 0.75;
