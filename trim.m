@@ -1,4 +1,4 @@
-function [theta_0, theta_c] = trim(V)
+function [theta_0, theta_c, theta_f] = trim(V)
 
 [heli, atm] = GetParams;
 
@@ -8,7 +8,8 @@ sigma  = heli.N * heli.c / (pi * heli.R);
 D_fus   = heli.Afront * heli.fuse_CD * 0.5 * atm.rho * V^2;
 T       = sqrt(heli.W^2 + D_fus^2);                                          % W6_L11_P3 slide 3, eq 1
 CT      = T / (atm.rho * (heli.Omega * heli.R)^2 * pi * heli.R^2);          % W6_L11_P2 slide 7, eq 12
-alpha_d = atan(D_fus / heli.W);                                               % W6_L11_P3 slide 6, eq 8
+alpha_d = atan(D_fus / heli.W);
+theta_f = -alpha_d;                                                % W6_L11_P3 slide 6, eq 8
 mu      = V / (heli.Omega * heli.R);
 
 glauert  = @(li) 2*li * sqrt((mu*sin(alpha_d) + li)^2 + (mu*cos(alpha_d))^2) - CT;  % W6_L11_P2 slide 10, eq 20
