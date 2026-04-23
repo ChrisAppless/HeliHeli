@@ -194,3 +194,99 @@ fprintf("$a_0$ & %.4f° \\\\\n", rad2deg(a0))
 fprintf("$a_1$ & %.4f° \\\\\n", rad2deg(a1))
 fprintf("$b_1$ & %.4f° \\\\\n", rad2deg(b1))
 
+
+
+%% Part 3 - Phugoid Analysis
+
+% Non-dimensionalization factors from Pavel's nomenclature
+A_force = atm.rho * pi*heli.R^2 * (heli.Omega*heli.R);          % for X_u, Z_u (δF/δvel)
+A_moment = atm.rho * pi*heli.R^2 * heli.Omega * heli.R^3;        % for M_q (δM/δangvel)
+A_moment_vel = atm.rho * pi*heli.R^2 * heli.R * heli.Omega;     % for M_u (δM/δvel)
+
+% Hover trim values needed for derivatives
+C_T   = heli.W / (atm.rho * pi*heli.R^2 * (heli.Omega*heli.R)^2);
+lam_i0_hov = sqrt(C_T/2);
+lam_i_hov  = (1 + heli.k_inflow) * lam_i0_hov;  % heli.k_inflow = 0.15 typically
+lam_hov    = -lam_i_hov;                         % alpha = 0 at hover
+theta0_hov = (6*C_T/(heli.sigma*a_lift) - 1.5*lam_hov);  % from closed-form hover collective
+
+% Non-dimensional CG offsets
+h_bar = heli.cgdist / heli.R;      % vertical CG-to-hub distance (nondim)
+f_bar = 0 / heli.R;      % horizontal CG-to-hub offset (nondim)
+
+% Hub moment coefficient (flap hinge / spring contribution)
+% For articulated: C_mE = e_bar * N_b * M_beta / (2 * rho * A * (Omega*R)^2 * R)
+% For hingeless: uses equivalent flap spring K_beta
+A     = pi * heli.R^2;
+C_mE = heli.e_bar * heli.m_blade / (atm.rho * A * heli.R);
+
+% Flapping derivative at hover
+da1_dmu_hov = (8/3)*theta0_hov + 2*lam_hov;
+
+% H-force derivative at hover  
+C_dm = getCD(perf.hov.alpha);  % mean drag coefficient
+lam_D_hov = lam_hov;            % at hover these coincide
+dCHD_dmu_hov = heli.sigma*C_dm/4 - (a_lift*heli.sigma*lam_D_hov/8)*da1_dmu_hov;
+
+% Flap response to pitch rate at hover
+da1_dqbar_hov = -16/gamma;
+
+% Non-dimensional stability derivatives (Pavel's lowercase)
+x_u = -C_T * da1_dmu_hov - dCHD_dmu_hov;
+m_u_prime = C_T*h_bar*da1_dmu_hov + C_mE*da1_dmu_hov;  % f_bar * dCT/dmu term vanishes at hover
+m_q_prime = -(16/gamma) * (C_T*h_bar + C_mE);
+
+% Convert to dimensional form for the characteristic equation
+I_y = heli.Iyy;
+m   = heli.m;
+
+X_u = x_u * A_force;
+M_u = m_u_prime * A_moment_vel * heli.R;   
+M_q = m_q_prime * A_moment;
+
+% Dimensional derivatives per unit mass / inertia
+Xu_hat = X_u / m;
+Mu_hat = M_u / I_y;
+Mq_hat = M_q / I_y;
+
+% Build the state matrix for [u; theta; q]
+A_phugoid = [Xu_hat,  -9.81,  0;
+             0,        0,     1;
+             Mu_hat,   0,     Mq_hat];
+
+% Find eigenvalues (roots of characteristic polynomial)
+eigs_phugoid = eig(A_phugoid);
+
+% Or equivalently via polynomial roots
+char_poly = [1, -(Xu_hat + Mq_hat), Xu_hat*Mq_hat, 9.81*Mu_hat];
+roots_poly = roots(char_poly);
+
+% Report
+fprintf("\n--- Phugoid Analysis (Hover) ---\n");
+fprintf("X_u = %.4e  [1/s]\n", Xu_hat);
+fprintf("M_u = %.4e  [rad/(m·s)]\n", Mu_hat);
+fprintf("M_q = %.4e  [1/s]\n", Mq_hat);
+fprintf("\nEigenvalues:\n");
+for k = 1:length(eigs_phugoid)
+    lam = eigs_phugoid(k);
+    if abs(imag(lam)) > 1e-6
+        omega_n = abs(lam);
+        zeta    = -real(lam)/omega_n;
+        period  = 2*pi/abs(imag(lam));
+        fprintf("  %+.4f %+.4fi   omega_n=%.3f rad/s, zeta=%.3f, T=%.2f s\n", ...
+                real(lam), imag(lam), omega_n, zeta, period);
+    else
+        t_half = log(2)/abs(real(lam));
+        fprintf("  %+.4f            real mode, t_{1/2 or 2}=%.2f s\n", real(lam), t_half);
+    end
+end
+
+% Plot poles on complex plane
+figure; hold on;
+plot(real(eigs_phugoid), imag(eigs_phugoid), 'rx', 'MarkerSize', 12, 'LineWidth', 2);
+xline(0, 'k--'); yline(0, 'k--');
+xlabel('Real part (1/s)');
+ylabel('Imaginary part (1/s)');
+title('Phugoid poles in hover');
+grid on; axis equal;
+exportgraphics(gcf, PLOT_DIR + "P3_phugoid_poles.png");

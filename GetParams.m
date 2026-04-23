@@ -27,6 +27,8 @@ heli.fuse_CD = 0.2;
 heli.k_tr = 1.4;
 heli.OmegaTail = 174.13;
 heli.m_blade = 101;     % blade mass [kg]
+heli.k_inflow = 0.15;
+heli.e_bar = 0.04;
 
 heli.sigma = heli.Ntail*heli.ctail/(pi*heli.Rtail);
 heli.sigma_tr = heli.N*heli.c/(pi*heli.R);
